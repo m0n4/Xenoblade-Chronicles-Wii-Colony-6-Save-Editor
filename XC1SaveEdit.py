@@ -2,8 +2,6 @@
 from crccheck.crc import CrcArc
 from crccheck.checksum import Checksum16
 import os, os.path
-#import shutil  
-#import struct
 import sys, getopt
 from itemlist import *
 
