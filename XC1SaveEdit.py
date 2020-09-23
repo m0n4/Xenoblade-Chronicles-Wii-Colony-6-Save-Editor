@@ -186,7 +186,7 @@ def start(argv):
             print('Xenoblade Chronicles (Wii) Colony 6 Save Editor\n')
             print('XC1SaveEdit.py -s <savefile> -c <command>')
             print('  savefile: monado01 monado02 monado03')
-            print('  command:  MaxGold ListGems Housing1 Commerce2 Nature3 Special4 Housing5\n')
+            print('  command:  MaxGold ListGems Housing1 Commerce2 Nature3 Special4 Replica5\n')
             print('ex: to add the items needed to rebuild commerce level 3 in Colony 6: ')
             print('python3 XC1SaveEdit.py -s monado01 -c Commerce3')
             sys.exit()
