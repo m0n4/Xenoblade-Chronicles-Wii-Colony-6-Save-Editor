@@ -4,9 +4,20 @@ from crccheck.checksum import Checksum16
 import os, os.path
 import sys, getopt
 from itemlist import *
+import argparse # native command line argument module superior to getopt
 
-def readsave():
-    with open(file, 'rb') as f:
+__doc__ = """
+Xenoblade Chronicles (Wii) Colony 6 Save Editor
+
+XC1SaveEdit.py -s <savefile> -c <command>
+savefile: monado01 monado02 monado03
+command:  MaxGold ListGems ListItems Housing1 Commerce2 Nature3 Special4 Replica5
+ex: to add the items needed to rebuild commerce level 3 in Colony 6:
+python3 XC1SaveEdit.py -s monado01 -c Commerce3 [-f itemName]
+"""
+
+def readsave(savefile):
+    with open(savefile, 'rb') as f:
         f.seek(0x22)
         r = f.read(8)
         a = int.from_bytes(r[2:4], "big")
@@ -18,20 +29,34 @@ def readsave():
         print('Location:', Maps.get(psn, "location unknown"))
 
 
-def gold():
+def gold(savefile,gold_amount=None):
+    """Sets Gold amount to maximum 99999997 by default or to a given value gold_amount"""
     gold_offset = 0x24048
-    gold_amount = 0x05f5e0fd
-    with open(file, 'r+b') as g:
+    if gold_amount is None:
+        gold_amount = 99999997 # 0x05f5e0fd
+    with open(savefile, 'r+b') as g:
         g.seek(gold_offset)
         g.write(gold_amount.to_bytes(4, "big")) 
-    print('Max gold added')
+    if gold_amount == 99999997:
+        print('Max gold added : 99 999 997')
+    else:
+        print('Gold amount is now : {}'.format(gold_amount))
 
-def crc():
+def getGold(savefile):
+    gold_offset = 0x24048
+    gold_amount = None
+    with open(savefile, 'rb') as g:
+        g.seek(gold_offset)
+        r = g.read(4)
+        gold_amount = int.from_bytes(r[:4], "big")
+    print('Current Gold amount : {}'.format(gold_amount))
+
+def crc(savefile):
     offsets =  [0x20, 0xA030, 0xB260, 0x11EB0, 0x11EE0, 0x11F30, 0x11F60, 0x24090, 0x240C0, 0x240F0, 0x244A0, 0x248B0]
     sizes = [0x9C80, 0x1214, 0x6C28, 0xC, 0x34, 0x10, 0x12120, 0x10, 0x10, 0x384, 0x234, 0x40]
     section = ["THUM", "FLAG", "GAME", "TIME",  "PCPM",  "CAMD",  "ITEM",  "WTHR",  "SNDS",  "MINE",  "TBOX",  "OPTD"]
     for i in range(12):
-        with open(file, 'rb') as f:
+        with open(savefile, 'rb') as f:
             f.seek(offsets[i]-4)
             r = f.read(sizes[i]+4) 
         crc_orig = int.from_bytes(r[:4], "big")
@@ -39,13 +64,13 @@ def crc():
         crc_calc = CrcArc.calc(data)
         if crc_calc != crc_orig:
             print(section[i], ': CRC FIXED') 
-            with open(file, 'r+b') as g:
+            with open(savefile, 'r+b') as g:
                 g.seek(offsets[i]-4)
                 g.write(crc_calc.to_bytes(4, "big")) 
 
 
-def colony6(add):
-    with open(file, 'rb') as f:  
+def colony6(savefile, add):
+    with open(savefile, 'rb') as f:  
         nb = 0
         myCollectable = {}
         f.seek(0x22118, 0)
@@ -136,15 +161,15 @@ def colony6(add):
     
     newCollectable += (4800-len(newCollectable)) * '0'
     newMaterial += (2400-len(newMaterial)) * '0'
-    with open(file, 'r+b') as f:
+    with open(savefile, 'r+b') as f:
         f.seek(0x22118, 0)
         f.write(bytearray.fromhex(newCollectable))
         f.seek(0x22a78, 0)
         f.write(bytearray.fromhex(newMaterial))
     print('Items added for', add)
 
-def gems():
-    with open(file, 'r+b') as f:
+def gems(savefile):
+    with open(savefile, 'r+b') as f:
         myGems = []
         f.seek(0x206D8, 0)
         for i in range(300):
@@ -173,46 +198,113 @@ def gems():
         print(g)
     print("Gems:",len(myGems))
 
-def start(argv):
-    savefile = ''
-    command = ''
-    try:
-        opts, args = getopt.getopt(argv,"hs:c:",["ifile=","ofile="])
-    except getopt.GetoptError:
-        print('test.py -s <savefile> -c <command> [-h]')
-        sys.exit()
-    for opt, arg in opts:
-        if opt == '-h' or len(sys.argv[1:]) != 4:
-            print('Xenoblade Chronicles (Wii) Colony 6 Save Editor\n')
-            print('XC1SaveEdit.py -s <savefile> -c <command>')
-            print('  savefile: monado01 monado02 monado03')
-            print('  command:  MaxGold ListGems Housing1 Commerce2 Nature3 Special4 Replica5\n')
-            print('ex: to add the items needed to rebuild commerce level 3 in Colony 6: ')
-            print('python3 XC1SaveEdit.py -s monado01 -c Commerce3')
-            sys.exit()
-        elif opt in ("-s", "--savefile"):
-            savefile = arg
-        elif opt in ("-c", "--command"):
-            command = arg
-    if os.path.isfile(savefile):
+
+def listItems(savefile, filter=None):
+    """List of all items in the save file.
+    If filter is a valid name, then print it only."""
+
+    if filter is not None: # test if given filter is a valid name
+        if filter in Collectable.values() or filter in Material.values() or filter in KeyItem.values():
+            print('{} is a valid item name'.format(filter))
+        else:
+            print('{} is not a valid item name. Aborting.'.format(filter))
+            sys.exit(0)
+    with open(savefile, 'rb') as f:
+        nb = 0
+        myCollectable = {}
+        f.seek(0x22118, 0)
+        for i in range(300):
+            r = f.read(8)
+            h = int.from_bytes(r, "big")
+            x = hex(h)[2:]
+            if x != '0':
+                Id = int(x[:3], 16)
+                Qte = int(x[12:-2], 16)
+                myCollectable.update({Id: Qte})
+                if filter is None or filter == Collectable[Id]: # print only is no filter or valid name
+                    print('{:3}  {}'.format(Qte, Collectable[Id]))
+                nb += 1
+        print("Collectable:", nb)
+
+        nb = 0
+        myMaterial = {}
+        f.seek(0x22a78, 0)
+        for i in range(150):
+            r = f.read(8)
+            h = int.from_bytes(r, "big")
+            x = hex(h)[2:]
+            if x != '0':
+                Id = int(x[:3], 16)
+                Qte = int(x[12:-2], 16)
+                myMaterial.update({Id: Qte})
+                if filter is None or filter == Material[Id]: # print only is no filter or valid name
+                    print('{:3}  {}'.format(Qte, Material[Id]))
+                nb += 1
+        print("Material:", nb)
+
+        nb = 0
+        f.seek(0x233d8, 0)
+        for i in range(300):
+            r = f.read(8)
+            h = int.from_bytes(r, "big")
+            x = hex(h)[2:]
+            if x != '0':
+                Id = int(x[:3], 16)
+                Qte = int(x[12:-2], 16)
+                if filter is None or filter == KeyItem[Id]:  # print only is no filter or valid name
+                    print('{:3}  {}'.format(Qte, KeyItem[Id]))
+                nb += 1
+        print("KeyItem:", nb)
+
+if __name__ == '__main__':
+    assert (sys.version_info > (3, 0)) # python 3 only
+    # Reading command line arguments
+    parser = argparse.ArgumentParser(description=__doc__)
+    available_commands = ('MaxGold','GetGold','SetGold','ListGems','ListItems',
+							'Housing1','Housing2','Housing3','Housing4','Housing5',
+							'Commerce1','Commerce2','Commerce3','Commerce4','Commerce5',
+							'Nature1','Nature2','Nature3','Nature4','Nature5',
+							'Special1','Special2','Special3','Special4','Special5',
+							'Replica1','Replica2','Replica3','Replica4','Replica5')
+    parser.add_argument('-s', '--savefile',dest='savefile',default='monado01',choices=('monado01','monado02','monado03'),help='Save file to read data from or to write data to, e.g., monado01 which is the default choice.')
+    parser.add_argument('-c', '--command',dest='command',default=None,choices=available_commands,help='Command, e.g., set maximum gold, list all gems and levels, list items, or add necessary collectables in order to be able to rebuild one part of Colony6 for a given level.')
+    parser.add_argument('-f', '--filter',dest='filter',default=None,help='Filter list of items/collectables to the provided name.')
+    parser.add_argument('-g', '--gold',dest='gold_amount',default=None,help='New gold amount value command is: SetGold (max=99999997).')
+    args = parser.parse_args()
+    savefile = args.savefile
+    command = args.command
+    filter = args.filter
+    gold_amount = args.gold_amount
+    if os.path.isfile(savefile): # Check savefile exists and is valid
         if os.stat(savefile).st_size != 163840:
             print("# Invalid savefile")
             sys.exit() 
     else:
         print("# Savefile not found")
-        print('test.py -s <savefile> -c <command> [-h]')
         sys.exit()
-    return(savefile, command)  
-
-
-if __name__ == '__main__':
-    assert (sys.version_info > (3, 0)) # python 3 only
-    file, command = start(sys.argv[1:])
-    readsave()
-    if command == 'MaxGold': gold()
-    elif command == 'ListGems': gems()
-    elif command in Colony6: colony6(command)
-    else: print('# Command unknown')        
-    crc()
+    readsave(savefile)
+    if command == 'MaxGold':
+        gold(savefile)
+    elif command == 'ListGems':
+        gems(savefile)
+    if command == 'GetGold':
+        getGold(savefile)
+    if command == 'SetGold':
+        if gold_amount is None:
+            print("Gold amount is not provided. Please use -g argument")
+            sys.exit() 
+        elif int(gold_amount) > 99999997:
+            print("Gold amount is more than maximum allowed : 99999997.")
+            sys.exit()
+        elif int(gold_amount) < 0:
+            print("Gold amount has to be positive or null.")
+            sys.exit()
+        else:
+            gold(savefile,int(gold_amount))
+    elif command == 'ListItems':
+        listItems(savefile,filter)
+    elif command in Colony6:
+        colony6(savefile,command)
+    crc(savefile)
     print('Done')
 
