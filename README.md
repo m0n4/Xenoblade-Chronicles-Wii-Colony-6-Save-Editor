@@ -9,15 +9,10 @@ XC1SaveEdit.py -s \<savefile\> -c \<command\>
 ex: to add the items needed to rebuild commerce level 3 in Colony 6:  
 ```python3 XC1SaveEdit.py -s monado01 -c Commerce3```
 
+```
 usage: XC1SaveEdit.py [-h] [-s {monado01,monado02,monado03}]
                       [-c {MaxGold,GetGold,SetGold,ListGems,ListItems,Housing1,Housing2,Housing3,Housing4,Housing5,Commerce1,Commerce2,Commerce3,Commerce4,Commerce5,Nature1,Nature2,Nature3,Nature4,Nature5,Special1,Special2,Special3,Special4,Special5,Replica1,Replica2,Replica3,Replica4,Replica5}]
                       [-f FILTER] [-g GOLD_AMOUNT]
-
-Xenoblade Chronicles (Wii) Colony 6 Save Editor XC1SaveEdit.py -s <savefile>
--c <command> savefile: monado01 monado02 monado03 command: MaxGold ListGems
-ListItems Housing1 Commerce2 Nature3 Special4 Replica5 ex: to add the items
-needed to rebuild commerce level 3 in Colony 6: python3 XC1SaveEdit.py -s
-monado01 -c Commerce3 [-f itemName]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -35,3 +30,4 @@ optional arguments:
   -g GOLD_AMOUNT, --gold GOLD_AMOUNT
                         New gold amount value command is: SetGold
                         (max=99999997).
+```
