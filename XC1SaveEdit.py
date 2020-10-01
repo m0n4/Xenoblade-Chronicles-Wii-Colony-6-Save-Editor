@@ -204,11 +204,7 @@ def listItems(savefile, filter=None):
     If filter is a valid name, then print it only."""
 
     if filter is not None: # test if given filter is a valid name
-        if filter in Collectable.values() or filter in Material.values() or filter in KeyItem.values():
-            print('{} is a valid item name'.format(filter))
-        else:
-            print('{} is not a valid item name. Aborting.'.format(filter))
-            sys.exit(0)
+        checkItemName(filter)
     with open(savefile, 'rb') as f:
         nb = 0
         myCollectable = {}
@@ -256,11 +252,116 @@ def listItems(savefile, filter=None):
                 nb += 1
         print("KeyItem:", nb)
 
+def checkItemName(filter):
+    """Checks if provided item name is valid"""
+    if filter in Collectable.values() or filter in Material.values() or filter in KeyItem.values():
+        print('{} is a valid item name'.format(filter))
+    else:
+        print('{} is not a valid item name. Aborting.'.format(filter))
+        sys.exit(0)
+
+def setItem(savefile, filter, nbItem):
+    """Set the number of items with name to value if nbItem is superior to existing one"""
+    checkItemName(filter)
+    myID = None # ID which corresponds to item name in Collectable, Materials or KeyItems dictionaries
+    with open(savefile, 'rb') as f:
+        nb = 0
+        myCollectable = {}
+        f.seek(0x22118, 0)
+        for i in range(300):
+            r = f.read(8)
+            h = int.from_bytes(r, "big")
+            x = hex(h)[2:]
+            if x != '0':
+                Id = int(x[:3], 16)
+                Qte = int(x[12:-2], 16)
+                myCollectable.update({Id: Qte})
+                if filter == Collectable[Id]: # print only is no filter or valid name
+                    print('{:3}  {}'.format(Qte, Collectable[Id]))
+                    myID = Id
+                    myCollectable.update({myID: nbItem}) # set number of items
+                nb += 1
+        print("Collectable:", nb)
+
+        nb = 0
+        myMaterial = {}
+        f.seek(0x22a78, 0)
+        for i in range(150):
+            r = f.read(8)
+            h = int.from_bytes(r, "big")
+            x = hex(h)[2:]
+            if x != '0':
+                Id = int(x[:3], 16)
+                Qte = int(x[12:-2], 16)
+                myMaterial.update({Id: Qte})
+                if filter == Material[Id]: # print only is no filter or valid name
+                    print('{:3}  {}'.format(Qte, Material[Id]))
+                    myID = Id
+                    myMaterial.update({myID: nbItem}) # set number of items
+                nb += 1
+        print("Material:", nb)
+
+        nb = 0
+        f.seek(0x233d8, 0)
+        for i in range(300):
+            r = f.read(8)
+            h = int.from_bytes(r, "big")
+            x = hex(h)[2:]
+            if x != '0':
+                Id = int(x[:3], 16)
+                Qte = int(x[12:-2], 16)
+                if filter == KeyItem[Id]: # print only is no filter or valid name
+                    print('{:3}  {}'.format(Qte, KeyItem[Id]))
+                    myID = Id
+                    print("Warning: this KeyItem will not be set to a different number. Not implemented yet.")
+                nb += 1
+        print("KeyItem:", nb)
+
+    if len(myMaterial.items()) > 150:
+        print("# Too many materials in inventory, aborting")
+        sys.exit()
+    if len(myCollectable.items()) > 300:
+        print("# Too many collectables in inventory, aborting")
+        sys.exit()
+
+    pick = 2
+    even = 0
+    newMaterial = ''
+    i = 0
+    for item, cnt in myMaterial.items():
+        i += 1
+        pick += 1
+        even += 2
+        itm = str(hex(item)[-3:])
+        newMaterial += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
+
+    pick = 2
+    even = 0
+    newCollectable = ''
+    i = 0
+    for item, cnt in myCollectable.items():
+        i += 1
+        pick += 1
+        even += 2
+        itm = str(hex(item)[-3:])
+        newCollectable += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
+
+    newCollectable += (4800 - len(newCollectable)) * '0'
+    newMaterial += (2400 - len(newMaterial)) * '0'
+    with open(savefile, 'r+b') as f:
+        f.seek(0x22118, 0)
+        f.write(bytearray.fromhex(newCollectable))
+        f.seek(0x22a78, 0)
+        f.write(bytearray.fromhex(newMaterial))
+    print('Item {} with ID {} is set to value {}'.format(filter,myID,nbItem) )
+
+
 if __name__ == '__main__':
     assert (sys.version_info > (3, 0)) # python 3 only
     # Reading command line arguments
     parser = argparse.ArgumentParser(description=__doc__)
-    available_commands = ('MaxGold','GetGold','SetGold','ListGems','ListItems',
+    available_commands = ('MaxGold','GetGold','SetGold',
+                            'ListGems','ListItems','SetItem',
 							'Housing1','Housing2','Housing3','Housing4','Housing5',
 							'Commerce1','Commerce2','Commerce3','Commerce4','Commerce5',
 							'Nature1','Nature2','Nature3','Nature4','Nature5',
@@ -270,11 +371,13 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--command',dest='command',default=None,choices=available_commands,help='Command, e.g., set maximum gold, list all gems and levels, list items, or add necessary collectables in order to be able to rebuild one part of Colony6 for a given level.')
     parser.add_argument('-f', '--filter',dest='filter',default=None,help='Filter list of items/collectables to the provided name.')
     parser.add_argument('-g', '--gold',dest='gold_amount',default=None,help='New gold amount value command is: SetGold (max=99999997).')
+    parser.add_argument('-n', '--nb',dest='nb',default=None,help='Number of items to set with -c SetItem command and -f itemName filter.')
     args = parser.parse_args()
     savefile = args.savefile
     command = args.command
     filter = args.filter
     gold_amount = args.gold_amount
+    nb = args.nb
     if os.path.isfile(savefile): # Check savefile exists and is valid
         if os.stat(savefile).st_size != 163840:
             print("# Invalid savefile")
@@ -287,9 +390,11 @@ if __name__ == '__main__':
         gold(savefile)
     elif command == 'ListGems':
         gems(savefile)
-    if command == 'GetGold':
+    elif command in Colony6:
+        colony6(savefile,command)
+    elif command == 'GetGold':
         getGold(savefile)
-    if command == 'SetGold':
+    elif command == 'SetGold':
         if gold_amount is None:
             print("Gold amount is not provided. Please use -g argument")
             sys.exit() 
@@ -302,9 +407,9 @@ if __name__ == '__main__':
         else:
             gold(savefile,int(gold_amount))
     elif command == 'ListItems':
-        listItems(savefile,filter)
-    elif command in Colony6:
-        colony6(savefile,command)
+        listItems(savefile, filter)
+    elif command == 'SetItem':
+        setItem(savefile,filter,int(nb))
     crc(savefile)
     print('Done')
 
