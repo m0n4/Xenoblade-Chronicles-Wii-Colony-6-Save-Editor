@@ -267,7 +267,7 @@ def checkItemName(filter):
             for itemIndex, itemName in items['list'].items():  # Looking for the proper item
                 if filter in itemName:
                     if debug: # show some details (item index)
-                        print('Collectable item index: {}'.format(itemIndex))
+                        print('{} item index: {}'.format(categoryName, itemIndex))
                     validItem = (categoryName, itemIndex)
     return validItem
 

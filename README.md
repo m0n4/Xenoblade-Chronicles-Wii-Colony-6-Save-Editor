@@ -32,4 +32,5 @@ optional arguments:
                         (max=99999997).
   -n NB, --nb NB        Number of items to set with -c SetItem command and -f
                         itemName filter.
+  -d, --debug           Debug mode, which shows more information.
 ```
