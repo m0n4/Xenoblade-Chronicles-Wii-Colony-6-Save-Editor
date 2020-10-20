@@ -207,7 +207,10 @@ def listItems(savefile, filter=None):
     If filter is a valid name, then print it only."""
 
     if filter is not None: # test if given filter is a valid name
-        checkItemName(filter)
+        filterItem = checkItemName(filter)
+        if filterItem is None:
+            print('{} is not a valid item name. Aborting.'.format(filter))
+            sys.exit()
     with open(savefile, 'rb') as f:
         nb = 0
         myCollectable = {}
@@ -256,32 +259,24 @@ def listItems(savefile, filter=None):
         print("KeyItem:", nb)
 
 def checkItemName(filter):
-    """Checks if provided item name is valid"""
-    if filter in Collectable.values() or filter in Material.values() or filter in KeyItem.values():
-        print('{} is a valid item name'.format(filter))
-        if debug: # prints out the type of item and its index (key)
-            if filter in Collectable.values(): # This is a Collectable item
-                for item in Collectable.items(): # Looking for the proper item
-                    if filter in item:
-                        print('Collectable item index: {}'.format(item[0]))
-                        return
-            if filter in Material.values():  # This is a Material item
-                for item in Material.items():  # Looking for the proper item
-                    if filter in item:
-                        print('Material item index: {}'.format(item[0]))
-                        return
-            if filter in KeyItem.values():  # This is a KeyItem item
-                for item in KeyItem.items():  # Looking for the proper item
-                    if filter in item:
-                        print('KeyItem item index: {}'.format(item[0]))
-                        return
-    else:
-        print('{} is not a valid item name. Aborting.'.format(filter))
-        sys.exit(0)
+    """Checks if provided item name is valid and, if so, returns its category and index, or None is invalid"""
+    validItem = None  # Provided item, by its name, is not valid at first glance
+    for categoryName, items in AllItems.items():  # Loop on all categories
+        if filter in items['list'].values():
+            print("'{}' is a valid item name from '{}' category".format(filter, categoryName))
+            for itemIndex, itemName in items['list'].items():  # Looking for the proper item
+                if filter in itemName:
+                    if debug: # show some details (item index)
+                        print('Collectable item index: {}'.format(itemIndex))
+                    validItem = (categoryName, itemIndex)
+    return validItem
 
 def setItem(savefile, filter, nbItem):
     """Set the number of items with name to value if nbItem is superior to existing one"""
-    checkItemName(filter)
+    filterItem = checkItemName(filter)
+    if filterItem is None:
+        print('{} is not a valid item name. Aborting.'.format(filter))
+        sys.exit()
     myID = None # ID which corresponds to item name in Collectable, Materials or KeyItems dictionaries
     with open(savefile, 'rb') as f:
         nb = 0
