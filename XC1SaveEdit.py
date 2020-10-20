@@ -16,6 +16,9 @@ ex: to add the items needed to rebuild commerce level 3 in Colony 6:
 python3 XC1SaveEdit.py -s monado01 -c Commerce3
 """
 
+# global variables
+debug = False # Debug mode, deactivated by default
+
 def readsave(savefile):
     with open(savefile, 'rb') as f:
         f.seek(0x22)
@@ -256,6 +259,22 @@ def checkItemName(filter):
     """Checks if provided item name is valid"""
     if filter in Collectable.values() or filter in Material.values() or filter in KeyItem.values():
         print('{} is a valid item name'.format(filter))
+        if debug: # prints out the type of item and its index (key)
+            if filter in Collectable.values(): # This is a Collectable item
+                for item in Collectable.items(): # Looking for the proper item
+                    if filter in item:
+                        print('Collectable item index: {}'.format(item[0]))
+                        return
+            if filter in Material.values():  # This is a Material item
+                for item in Material.items():  # Looking for the proper item
+                    if filter in item:
+                        print('Material item index: {}'.format(item[0]))
+                        return
+            if filter in KeyItem.values():  # This is a KeyItem item
+                for item in KeyItem.items():  # Looking for the proper item
+                    if filter in item:
+                        print('KeyItem item index: {}'.format(item[0]))
+                        return
     else:
         print('{} is not a valid item name. Aborting.'.format(filter))
         sys.exit(0)
@@ -356,8 +375,10 @@ def setItem(savefile, filter, nbItem):
     print('Item {} with ID {} is set to value {}'.format(filter,myID,nbItem) )
 
 
-if __name__ == '__main__':
+def main():
+    """Main program which is executed when used as a program from a terminal"""
     assert (sys.version_info > (3, 0)) # python 3 only
+    global debug # global variables defined at the beginning of the file
     # Reading command line arguments
     parser = argparse.ArgumentParser(description=__doc__)
     available_commands = ('MaxGold','GetGold','SetGold',
@@ -372,12 +393,17 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--filter',dest='filter',default=None,help='Filter list of items/collectables to the provided name.')
     parser.add_argument('-g', '--gold',dest='gold_amount',default=None,help='New gold amount value command is: SetGold (max=99999997).')
     parser.add_argument('-n', '--nb',dest='nb',default=None,help='Number of items to set with -c SetItem command and -f itemName filter.')
+    parser.add_argument('-d', '--debug',dest='debug',action='store_true',help='Debug mode, which shows more information.')
     args = parser.parse_args()
     savefile = args.savefile
     command = args.command
     filter = args.filter
     gold_amount = args.gold_amount
     nb = args.nb
+    if args.debug:
+        debug = True
+    else:
+        debug = False
     if os.path.isfile(savefile): # Check savefile exists and is valid
         if os.stat(savefile).st_size != 163840:
             print("# Invalid savefile")
@@ -413,3 +439,5 @@ if __name__ == '__main__':
     crc(savefile)
     print('Done')
 
+if __name__ == '__main__':
+    main()
