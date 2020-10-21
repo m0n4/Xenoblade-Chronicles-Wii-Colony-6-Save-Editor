@@ -202,10 +202,11 @@ def gems(savefile):
     print("Gems:",len(myGems))
 
 
-def listItems(savefile, filter=None):
+def listItems(savefile, filter=None, showList=True):
     """List of all items in the save file.
     If filter is a valid name, then print it only.
-    This function returns the list of all items found and their number"""
+    This function returns the list of all items found and their number
+    Complete list of available items is shown by default, but it can be hidden with option showList=False"""
     myItems = {} # List of all items found : (index,number)
     if filter is not None: # test if given filter is a valid name
         filterItem = checkItemName(filter)
@@ -224,7 +225,7 @@ def listItems(savefile, filter=None):
                     Id = int(x[:3], 16)
                     Qte = int(x[12:-2], 16)
                     myCategory.update({Id: Qte})
-                    if filter is None or filter == AllItems[category]['list'][Id]: # print only is no filter or valid name
+                    if (filter is None and showList) or filter == AllItems[category]['list'][Id]: # print only is no filter or valid name
                         print('{:3}  {}'.format(Qte, AllItems[category]['list'][Id]))
                     nb += 1
             print("{}: {}".format(category,nb)) # shows the number of existing items for such category
@@ -247,23 +248,25 @@ def checkItemName(filter):
     return validItem
 
 def setItem(savefile, filter, nbItem):
-    """Set the number of items with name to value if nbItem is superior to existing one"""
+    """Set the number of items with name to nbItem value.
+    Control is checked on value superior to 0 and less than a maximum value specific to a category.
+    This function also permits to add new items if there are room for them in the inventory."""
     filterItem = checkItemName(filter) # checks that filter item is valid...
     if filterItem is None:
         return None # ... and exits function and returns None if invalid.
-    myID = None # ID which corresponds to item name in Collectable, Materials or KeyItems dictionaries
-    myItems = listItems(savefile) # returns existing items
+    if nbItem == 0: # checks if number of asked items is superior to 0
+        print("Warning: this number of items asked is equal to 0, which is an invalid choice")
+        return None  # Exiting the function while returning None
+    myItems = listItems(savefile,showList=False) # returns existing items without showing the list
     myFilterCategory, myFilterIndex = filterItem # extracts my filter category and item index
-    if myFilterCategory != 'KeyItem':
-        myItems[myFilterCategory].update({myFilterIndex: nbItem}) # Set the new number of items
-        print("{:3}  '{}'".format(nbItem, AllItems[myFilterCategory]['list'][myFilterIndex]))
-    else: # KeyItem not available for setting
-        print("{:3}  '{}'".format(nbItem, AllItems[myFilterCategory]['list'][myFilterIndex]))
-        print("Warning: this KeyItem will not be set to a different number. Not implemented yet.")
-        return None # Exiting the function while returning None
-    with open(savefile, 'r+b') as f:
+    if nbItem > AllItems[myFilterCategory]['maxNb']: # checks if number of asked items is less than a maximum value specific to a category
+        print("Warning: this number ",nbItem," of items asked is superior to the maximum ",AllItems[myFilterCategory]['maxNb']," allowed for such category:",myFilterCategory)
+        return None  # Exiting the function while returning None
+    myItems[myFilterCategory].update({myFilterIndex: nbItem}) # Set the new number of items, and add new items if any
+    print("{:3}  '{}'".format(nbItem, AllItems[myFilterCategory]['list'][myFilterIndex]))
+    with open(savefile, 'r+b') as f: # Open the backup file in order to write new values from a binary string to be defined below, for each category
         for category in AllItems.keys():  # Loop over all available categories
-            myCategory = myItems[category] # gets available items and the
+            myCategory = myItems[category] # gets available items and their number, eventually updated, for such category
             if len(myCategory.items()) <= AllItems[category]['maxSlots']: # Build binary string to store in the backup file for such category
                 pick = 2
                 even = 0
@@ -277,10 +280,10 @@ def setItem(savefile, filter, nbItem):
                     newCategory += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
                 if len(myCategory.items()) < AllItems[category]['maxSlots']:  # Adding empty slots if any
                     newCategory += (AllItems[category]['maxSlots'] * 16 - len(newCategory)) * '0'
-                    f.seek(AllItems[category]['backupStart'],0)  # Goes at the start location in the backup file for such category
-                    f.write(bytearray.fromhex(newCategory))  # Writes the category items and their new number in the backup file
+                f.seek(AllItems[category]['backupStart'],0)  # Goes at the start location in the backup file for such category
+                f.write(bytearray.fromhex(newCategory))  # Writes the category items and their new number in the backup file
             else:
-                print("# Too many items from category: ",category," in inventory, aborting.")
+                print("# Too many items from category: ",category," in inventory, aborting storing in backup file: ",savefile)
 
 def main():
     """Main program which is executed when used as a program from a terminal"""
