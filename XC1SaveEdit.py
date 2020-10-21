@@ -248,101 +248,39 @@ def checkItemName(filter):
 
 def setItem(savefile, filter, nbItem):
     """Set the number of items with name to value if nbItem is superior to existing one"""
-    filterItem = checkItemName(filter)
+    filterItem = checkItemName(filter) # checks that filter item is valid...
     if filterItem is None:
-        return None
+        return None # ... and exits function and returns None if invalid.
     myID = None # ID which corresponds to item name in Collectable, Materials or KeyItems dictionaries
-    with open(savefile, 'rb') as f:
-        nb = 0
-        myCollectable = {}
-        f.seek(0x22118, 0)
-        for i in range(300):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0':
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                myCollectable.update({Id: Qte})
-                if filter == Collectable[Id]: # print only is no filter or valid name
-                    print('{:3}  {}'.format(Qte, Collectable[Id]))
-                    myID = Id
-                    myCollectable.update({myID: nbItem}) # set number of items
-                nb += 1
-        print("Collectable:", nb)
-
-        nb = 0
-        myMaterial = {}
-        f.seek(0x22a78, 0)
-        for i in range(150):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0':
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                myMaterial.update({Id: Qte})
-                if filter == Material[Id]: # print only is no filter or valid name
-                    print('{:3}  {}'.format(Qte, Material[Id]))
-                    myID = Id
-                    myMaterial.update({myID: nbItem}) # set number of items
-                nb += 1
-        print("Material:", nb)
-
-        nb = 0
-        f.seek(0x233d8, 0)
-        for i in range(300):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0':
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                if filter == KeyItem[Id]: # print only is no filter or valid name
-                    print('{:3}  {}'.format(Qte, KeyItem[Id]))
-                    myID = Id
-                    print("Warning: this KeyItem will not be set to a different number. Not implemented yet.")
-                nb += 1
-        print("KeyItem:", nb)
-
-    if len(myMaterial.items()) > 150:
-        print("# Too many materials in inventory, aborting")
-        sys.exit()
-    if len(myCollectable.items()) > 300:
-        print("# Too many collectables in inventory, aborting")
-        sys.exit()
-
-    pick = 2
-    even = 0
-    newMaterial = ''
-    i = 0
-    for item, cnt in myMaterial.items():
-        i += 1
-        pick += 1
-        even += 2
-        itm = str(hex(item)[-3:])
-        newMaterial += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
-
-    pick = 2
-    even = 0
-    newCollectable = ''
-    i = 0
-    for item, cnt in myCollectable.items():
-        i += 1
-        pick += 1
-        even += 2
-        itm = str(hex(item)[-3:])
-        newCollectable += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
-
-    newCollectable += (4800 - len(newCollectable)) * '0'
-    newMaterial += (2400 - len(newMaterial)) * '0'
+    myItems = listItems(savefile) # returns existing items
+    myFilterCategory, myFilterIndex = filterItem # extracts my filter category and item index
+    if myFilterCategory != 'KeyItem':
+        myItems[myFilterCategory].update({myFilterIndex: nbItem}) # Set the new number of items
+        print("{:3}  '{}'".format(nbItem, AllItems[myFilterCategory]['list'][myFilterIndex]))
+    else: # KeyItem not available for setting
+        print("{:3}  '{}'".format(nbItem, AllItems[myFilterCategory]['list'][myFilterIndex]))
+        print("Warning: this KeyItem will not be set to a different number. Not implemented yet.")
+        return None # Exiting the function while returning None
     with open(savefile, 'r+b') as f:
-        f.seek(0x22118, 0)
-        f.write(bytearray.fromhex(newCollectable))
-        f.seek(0x22a78, 0)
-        f.write(bytearray.fromhex(newMaterial))
-    print('Item {} with ID {} is set to value {}'.format(filter,myID,nbItem) )
-
+        for category in AllItems.keys():  # Loop over all available categories
+            myCategory = myItems[category] # gets available items and the
+            if len(myCategory.items()) <= AllItems[category]['maxSlots']: # Build binary string to store in the backup file for such category
+                pick = 2
+                even = 0
+                newCategory = ''
+                i = 0
+                for item, cnt in myCategory.items():
+                    i += 1
+                    pick += 1
+                    even += 2
+                    itm = str(hex(item)[-3:])
+                    newCategory += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
+                if len(myCategory.items()) < AllItems[category]['maxSlots']:  # Adding empty slots if any
+                    newCategory += (AllItems[category]['maxSlots'] * 16 - len(newCategory)) * '0'
+                    f.seek(AllItems[category]['backupStart'],0)  # Goes at the start location in the backup file for such category
+                    f.write(bytearray.fromhex(newCategory))  # Writes the category items and their new number in the backup file
+            else:
+                print("# Too many items from category: ",category," in inventory, aborting.")
 
 def main():
     """Main program which is executed when used as a program from a terminal"""
