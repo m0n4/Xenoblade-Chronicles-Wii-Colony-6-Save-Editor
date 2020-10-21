@@ -208,9 +208,8 @@ def listItems(savefile, filter=None):
 
     if filter is not None: # test if given filter is a valid name
         filterItem = checkItemName(filter)
-        if filterItem is None:
-            print('{} is not a valid item name. Aborting.'.format(filter))
-            sys.exit()
+        if filterItem is None: # Not a valid item name, exiting this function
+            return None
     with open(savefile, 'rb') as f:
         nb = 0
         myCollectable = {}
@@ -269,14 +268,15 @@ def checkItemName(filter):
                     if debug: # show some details (item index)
                         print('{} item index: {}'.format(categoryName, itemIndex))
                     validItem = (categoryName, itemIndex)
+    if validItem is None: # this item filter is not valid, print message
+        print("'{}' is not a valid item name. Aborting.".format(filter))
     return validItem
 
 def setItem(savefile, filter, nbItem):
     """Set the number of items with name to value if nbItem is superior to existing one"""
     filterItem = checkItemName(filter)
     if filterItem is None:
-        print('{} is not a valid item name. Aborting.'.format(filter))
-        sys.exit()
+        return None
     myID = None # ID which corresponds to item name in Collectable, Materials or KeyItems dictionaries
     with open(savefile, 'rb') as f:
         nb = 0
