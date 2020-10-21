@@ -204,58 +204,32 @@ def gems(savefile):
 
 def listItems(savefile, filter=None):
     """List of all items in the save file.
-    If filter is a valid name, then print it only."""
-
+    If filter is a valid name, then print it only.
+    This function returns the list of all items found and their number"""
+    myItems = {} # List of all items found : (index,number)
     if filter is not None: # test if given filter is a valid name
         filterItem = checkItemName(filter)
         if filterItem is None: # Not a valid item name, exiting this function
             return None
     with open(savefile, 'rb') as f:
-        nb = 0
-        myCollectable = {}
-        f.seek(0x22118, 0)
-        for i in range(300):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0':
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                myCollectable.update({Id: Qte})
-                if filter is None or filter == Collectable[Id]: # print only is no filter or valid name
-                    print('{:3}  {}'.format(Qte, Collectable[Id]))
-                nb += 1
-        print("Collectable:", nb)
-
-        nb = 0
-        myMaterial = {}
-        f.seek(0x22a78, 0)
-        for i in range(150):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0':
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                myMaterial.update({Id: Qte})
-                if filter is None or filter == Material[Id]: # print only is no filter or valid name
-                    print('{:3}  {}'.format(Qte, Material[Id]))
-                nb += 1
-        print("Material:", nb)
-
-        nb = 0
-        f.seek(0x233d8, 0)
-        for i in range(300):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0':
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                if filter is None or filter == KeyItem[Id]:  # print only is no filter or valid name
-                    print('{:3}  {}'.format(Qte, KeyItem[Id]))
-                nb += 1
-        print("KeyItem:", nb)
+        for category in AllItems.keys(): # Loop over all available categories
+            nb = 0
+            myCategory = {}
+            f.seek(AllItems[category]['backupStart'], 0) # Goes into the backup file at starting location for this category
+            for i in range(AllItems[category]['maxSlots']): # Loop over all existing slots in backup file for this category
+                r = f.read(8)
+                h = int.from_bytes(r, "big")
+                x = hex(h)[2:]
+                if x != '0':
+                    Id = int(x[:3], 16)
+                    Qte = int(x[12:-2], 16)
+                    myCategory.update({Id: Qte})
+                    if filter is None or filter == AllItems[category]['list'][Id]: # print only is no filter or valid name
+                        print('{:3}  {}'.format(Qte, AllItems[category]['list'][Id]))
+                    nb += 1
+            print("{}: {}".format(category,nb)) # shows the number of existing items for such category
+            myItems[category] = myCategory # Store existing items in the dictionary to be returned finally
+    return myItems
 
 def checkItemName(filter):
     """Checks if provided item name is valid and, if so, returns its category and index, or None is invalid"""
