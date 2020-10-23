@@ -71,7 +71,6 @@ def crc(savefile):
                 g.seek(offsets[i]-4)
                 g.write(crc_calc.to_bytes(4, "big")) 
 
-
 def colony6(savefile, add):
     '''Add Collectable and/or Material items needed for the specified part of Colony 6 reconstruction.
     These items are added only if they do not exist in the inventory yet and if they are too few number.'''
@@ -89,26 +88,7 @@ def colony6(savefile, add):
                 myCategory.update({key: value})
             myItems[myCategoryName] = myCategory # Store value update for colony reconstruction in myItems, for later writing to savefile
             print("{:3}  '{}'".format(value, AllItems[myCategoryName]['list'][key]))
-    with open(savefile, 'r+b') as f: # Open the backup file in order to write new values from a binary string to be defined below, for each category
-        for category in AllItems.keys():  # Loop over all available categories
-            myCategory = myItems[category] # gets available items and their number, eventually updated, for such category
-            if len(myCategory.items()) <= AllItems[category]['maxSlots']: # Build binary string to store in the backup file for such category
-                pick = 2
-                even = 0
-                newCategory = ''
-                i = 0
-                for item, cnt in myCategory.items():
-                    i += 1
-                    pick += 1
-                    even += 2
-                    itm = str(hex(item)[-3:])
-                    newCategory += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
-                if len(myCategory.items()) < AllItems[category]['maxSlots']:  # Adding empty slots if any
-                    newCategory += (AllItems[category]['maxSlots'] * 16 - len(newCategory)) * '0'
-                f.seek(AllItems[category]['backupStart'],0)  # Goes at the start location in the backup file for such category
-                f.write(bytearray.fromhex(newCategory))  # Writes the category items and their new number in the backup file
-            else:
-                print("# Too many items from category: ",category," in inventory, aborting storing in backup file: ",savefile)
+    writeItems(savefile,myItems)
 
 def gems(savefile):
     with open(savefile, 'r+b') as f:
@@ -203,26 +183,7 @@ def setItem(savefile, filter, nbItem):
         return None  # Exiting the function while returning None
     myItems[myFilterCategory].update({myFilterIndex: nbItem}) # Set the new number of items, and add new items if any
     print("{:3}  '{}'".format(nbItem, AllItems[myFilterCategory]['list'][myFilterIndex]))
-    with open(savefile, 'r+b') as f: # Open the backup file in order to write new values from a binary string to be defined below, for each category
-        for category in AllItems.keys():  # Loop over all available categories
-            myCategory = myItems[category] # gets available items and their number, eventually updated, for such category
-            if len(myCategory.items()) <= AllItems[category]['maxSlots']: # Build binary string to store in the backup file for such category
-                pick = 2
-                even = 0
-                newCategory = ''
-                i = 0
-                for item, cnt in myCategory.items():
-                    i += 1
-                    pick += 1
-                    even += 2
-                    itm = str(hex(item)[-3:])
-                    newCategory += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
-                if len(myCategory.items()) < AllItems[category]['maxSlots']:  # Adding empty slots if any
-                    newCategory += (AllItems[category]['maxSlots'] * 16 - len(newCategory)) * '0'
-                f.seek(AllItems[category]['backupStart'],0)  # Goes at the start location in the backup file for such category
-                f.write(bytearray.fromhex(newCategory))  # Writes the category items and their new number in the backup file
-            else:
-                print("# Too many items from category: ",category," in inventory, aborting storing in backup file: ",savefile)
+    writeItems(savefile,myItems)
 
 def deleteItem(savefile, filter):
     """Delete an item given by its name (filter).
@@ -232,8 +193,15 @@ def deleteItem(savefile, filter):
         return None # ... and exits function and returns None if invalid.
     myItems = listItems(savefile,showList=False) # returns existing items without showing the list
     myFilterCategory, myFilterIndex = filterItem # extracts my filter category and item index
-    myItems[myFilterCategory].pop(myFilterIndex) # Delete the item
     print("Deleting '{}' ...".format(AllItems[myFilterCategory]['list'][myFilterIndex]))
+    try:
+        myItems[myFilterCategory].pop(myFilterIndex) # Delete the item
+    except:
+        print("This item seems to be unknown from the inventory. Deleting is cancelled.")
+    writeItems(savefile,myItems)
+
+def writeItems(savefile,myItems):
+    '''Write myItems-like dictionary into the backup file savefile'''
     with open(savefile, 'r+b') as f: # Open the backup file in order to write new values from a binary string to be defined below, for each category
         for category in AllItems.keys():  # Loop over all available categories
             myCategory = myItems[category] # gets available items and their number, eventually updated, for such category
