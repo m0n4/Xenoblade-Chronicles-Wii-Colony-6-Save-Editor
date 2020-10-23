@@ -224,6 +224,37 @@ def setItem(savefile, filter, nbItem):
             else:
                 print("# Too many items from category: ",category," in inventory, aborting storing in backup file: ",savefile)
 
+def deleteItem(savefile, filter):
+    """Delete an item given by its name (filter).
+    It permits to make room in the inventory."""
+    filterItem = checkItemName(filter) # checks that filter item is valid...
+    if filterItem is None:
+        return None # ... and exits function and returns None if invalid.
+    myItems = listItems(savefile,showList=False) # returns existing items without showing the list
+    myFilterCategory, myFilterIndex = filterItem # extracts my filter category and item index
+    myItems[myFilterCategory].pop(myFilterIndex) # Delete the item
+    print("Deleting '{}' ...".format(AllItems[myFilterCategory]['list'][myFilterIndex]))
+    with open(savefile, 'r+b') as f: # Open the backup file in order to write new values from a binary string to be defined below, for each category
+        for category in AllItems.keys():  # Loop over all available categories
+            myCategory = myItems[category] # gets available items and their number, eventually updated, for such category
+            if len(myCategory.items()) <= AllItems[category]['maxSlots']: # Build binary string to store in the backup file for such category
+                pick = 2
+                even = 0
+                newCategory = ''
+                i = 0
+                for item, cnt in myCategory.items():
+                    i += 1
+                    pick += 1
+                    even += 2
+                    itm = str(hex(item)[-3:])
+                    newCategory += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
+                if len(myCategory.items()) < AllItems[category]['maxSlots']:  # Adding empty slots if any
+                    newCategory += (AllItems[category]['maxSlots'] * 16 - len(newCategory)) * '0'
+                f.seek(AllItems[category]['backupStart'],0)  # Goes at the start location in the backup file for such category
+                f.write(bytearray.fromhex(newCategory))  # Writes the category items and their new number in the backup file
+            else:
+                print("# Too many items from category: ",category," in inventory, aborting storing in backup file: ",savefile)
+
 def main():
     """Main program which is executed when used as a program from a terminal"""
     assert (sys.version_info > (3, 0)) # python 3 only
@@ -231,7 +262,7 @@ def main():
     # Reading command line arguments
     parser = argparse.ArgumentParser(description=__doc__)
     available_commands = ('MaxGold','GetGold','SetGold',
-                            'ListGems','ListItems','SetItem',
+                            'ListGems','ListItems','SetItem','DeleteItem',
 							'Housing1','Housing2','Housing3','Housing4','Housing5',
 							'Commerce1','Commerce2','Commerce3','Commerce4','Commerce5',
 							'Nature1','Nature2','Nature3','Nature4','Nature5',
@@ -285,6 +316,8 @@ def main():
         listItems(savefile, filter)
     elif command == 'SetItem':
         setItem(savefile,filter,int(nb))
+    elif command == 'DeleteItem':
+        deleteItem(savefile,filter)
     crc(savefile)
     print('Done')
 
