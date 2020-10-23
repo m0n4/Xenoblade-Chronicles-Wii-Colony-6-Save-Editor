@@ -73,103 +73,42 @@ def crc(savefile):
 
 
 def colony6(savefile, add):
-    with open(savefile, 'rb') as f:  
-        nb = 0
-        myCollectable = {}
-        f.seek(0x22118, 0)
-        for i in range(300):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0': 
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                myCollectable.update( {Id : Qte} )
-                print('{:3}  {}'.format(Qte, Collectable[Id]))
-                nb += 1   
-        print("Collectable:", nb)
-    
-        nb = 0
-        myMaterial = {}
-        f.seek(0x22a78, 0)
-        for i in range(150):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0': 
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                myMaterial.update( {Id : Qte} )
-                print('{:3}  {}'.format(Qte, Material[Id]))
-                nb += 1
-        print("Material:", nb)
-     
-        nb = 0
-        f.seek(0x233d8, 0)
-        for i in range(300):
-            r = f.read(8)
-            h = int.from_bytes(r, "big")
-            x = hex(h)[2:]
-            if x != '0': 
-                Id = int(x[:3], 16)
-                Qte = int(x[12:-2], 16)
-                print('{:3}  {}'.format(Qte, KeyItem[Id]))
-                nb += 1
-        print("KeyItem:", nb)
-    
-    addMaterial = Colony6[add][1]
-    addCollectible = Colony6[add][2]
-    for key, value in addMaterial.items():
-        if key in myMaterial:
-            if myMaterial[key] < value:
-                myMaterial.update({key: value})
-        else:
-            myMaterial.update({key: value})
-    
-    for key, value in addCollectible.items():
-        if key in myCollectable:
-            if myCollectable[key] < value:
-                myCollectable.update({key: value})
-        else:
-            myCollectable.update({key: value})
-        
-    if len(myMaterial.items()) > 150:
-        print("# Too many materials in inventory, aborting")
-        sys.exit()
-    if len(myCollectable.items()) > 300:
-        print("# Too many collectables in inventory, aborting")
-        sys.exit()
-    
-    pick = 2
-    even = 0
-    newMaterial = ''
-    i = 0
-    for item, cnt in myMaterial.items():
-        i += 1
-        pick += 1
-        even += 2   
-        itm = str(hex(item)[-3:])
-        newMaterial += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) +'00'
-    
-    pick = 2
-    even = 0
-    newCollectable = ''
-    i = 0
-    for item, cnt in myCollectable.items():
-        i += 1
-        pick += 1
-        even += 2   
-        itm = str(hex(item)[-3:])
-        newCollectable += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) +'00'
-    
-    newCollectable += (4800-len(newCollectable)) * '0'
-    newMaterial += (2400-len(newMaterial)) * '0'
-    with open(savefile, 'r+b') as f:
-        f.seek(0x22118, 0)
-        f.write(bytearray.fromhex(newCollectable))
-        f.seek(0x22a78, 0)
-        f.write(bytearray.fromhex(newMaterial))
-    print('Items added for', add)
+    '''Add Collectable and/or Material items needed for the specified part of Colony 6 reconstruction.
+    These items are added only if they do not exist in the inventory yet and if they are too few number.'''
+    myItems = listItems(savefile,showList=False) # returns existing items without showing the list
+    Colony6Categories = ('Material','Collectable') # Category Names used from <add> with correct order
+    for i in range(len(Colony6Categories)):
+        myCategoryName = Colony6Categories[i]
+        myCategory = myItems[myCategoryName]
+        addCategory = Colony6[add][i+1] # first category starts at 0 index but is 1 in <add>...
+        for key, value in addCategory.items():
+            if key in myCategory:
+                if myCategory[key] < value:
+                    myCategory.update({key: value})
+            else:
+                myCategory.update({key: value})
+            myItems[myCategoryName] = myCategory # Store value update for colony reconstruction in myItems, for later writing to savefile
+            print("{:3}  '{}'".format(value, AllItems[myCategoryName]['list'][key]))
+    with open(savefile, 'r+b') as f: # Open the backup file in order to write new values from a binary string to be defined below, for each category
+        for category in AllItems.keys():  # Loop over all available categories
+            myCategory = myItems[category] # gets available items and their number, eventually updated, for such category
+            if len(myCategory.items()) <= AllItems[category]['maxSlots']: # Build binary string to store in the backup file for such category
+                pick = 2
+                even = 0
+                newCategory = ''
+                i = 0
+                for item, cnt in myCategory.items():
+                    i += 1
+                    pick += 1
+                    even += 2
+                    itm = str(hex(item)[-3:])
+                    newCategory += itm + 'b' + '{:03x}'.format(even) + '00' + '{:03x}'.format(pick) + '{:02x}'.format(cnt) + '00'
+                if len(myCategory.items()) < AllItems[category]['maxSlots']:  # Adding empty slots if any
+                    newCategory += (AllItems[category]['maxSlots'] * 16 - len(newCategory)) * '0'
+                f.seek(AllItems[category]['backupStart'],0)  # Goes at the start location in the backup file for such category
+                f.write(bytearray.fromhex(newCategory))  # Writes the category items and their new number in the backup file
+            else:
+                print("# Too many items from category: ",category," in inventory, aborting storing in backup file: ",savefile)
 
 def gems(savefile):
     with open(savefile, 'r+b') as f:
