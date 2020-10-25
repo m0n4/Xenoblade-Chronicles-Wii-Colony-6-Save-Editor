@@ -1867,3 +1867,13 @@ Colony6 = {
   "Replica5": {1: {2435: 1, 2310: 1, 2308: 1},
               2: {}}
 }
+
+# One dictionary to collect all item categories and characteristics from monado0n backup files
+# For each category (Collectable, Material or KeyItem) is provided three values:
+# - list: full dictionary with index as key and item full name,
+# - maxSlots: maximum number of available slots in monado0n backup file, not to be overwhelmed
+# - backupStart: memory adress to start searching for the first item of the category,
+# - maxNb: maximum number of items allowed, especially 1 for KeyItem,
+AllItems = {'Collectable':{'list':Collectable,'maxSlots':300,'backupStart':0x22118,'maxNb':99},
+            'Material':{'list':Material,'maxSlots':150,'backupStart':0x22a78,'maxNb':99},
+            'KeyItem':{'list':KeyItem,'maxSlots':300,'backupStart':0x233d8,'maxNb':1}}
